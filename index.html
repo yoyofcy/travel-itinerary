@@ -1433,13 +1433,22 @@
       </div>
       
       <p style="font-size: 0.88rem; color: var(--on-surface-variant); margin-top: 0;">
-        <strong>目的地：</strong>日本東京都・山梨縣富士五湖・神奈川箱根溫泉<br>
+        <strong>目的地：</strong>
+        <span id="displayTripDestination">日本東京都・山梨縣富士五湖・神奈川箱根溫泉</span>
+        <br>
         <strong>旅遊日期：</strong><span id="displayTripRange">2027-01-15 至 2027-01-21</span>（共 <span id="displayTripDays">7</span> 天）
       </p>
 
       <div style="display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-bottom: var(--space-sm);">
+        <button type="button"
+        class="btn-outline"
+        onclick="editTripDestination()"
+        style="display: flex; justify-content: center; width: 100%; margin-bottom: 10px;">
+        <i data-lucide="map-pin"></i>
+        編輯目的地
+        </button>
         <button class="btn-solid-primary" onclick="openDatePickerModal()">
-          <i data-lucide="calendar"></i> 變更行程日期 (選完即關閉)
+          <i data-lucide="calendar"></i> 變更行程日期
         </button>
         <button class="btn-outline" onclick="openMemberModal()">
           <i data-lucide="users"></i> 管理團隊成員 (<span id="companionCount">4</span>人)
@@ -1696,7 +1705,7 @@
     <!-- Active Day Banner -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
       <div>
-        <h2 style="font-family: var(--font-headline); font-size: 1.25rem; margin: 0;" id="currentDayTitle">Day 1 · 成田機場抵達與東京丸之內夜景</h2>
+        <h2 style="font-family: var(--font-headline); font-size: 1.25rem; margin: 0;" id="currentDayTitle">Day 1</h2>
         <span style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;" id="currentDayDateText">2027-01-15 (週五) · 冬季氣候 4°C~11°C</span>
       </div>
       <button class="btn-action-sm" onclick="addNewDay()"><i data-lucide="calendar-plus"></i> 加天數</button>
@@ -2097,9 +2106,6 @@
       <button class="btn-icon-soft" onclick="closeDatePickerModal()"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body">
-      <p style="font-size: 0.8rem; color: var(--on-surface-variant); margin-top: 0;">
-        ⚡ <strong>選完即關閉：</strong>選取完「開始」與「結束」日期後，系統會自動重新計算行程天數並關閉彈窗，無需點選確認按鈕。
-      </p>
 
       <div class="form-group">
         <label class="form-label">1. 行程開始日期</label>
@@ -2162,8 +2168,19 @@
       <button class="btn-outline" onclick="closeVjwEditModal()">取消</button>
       <button class="btn-solid-primary" onclick="saveVjwData()"><i data-lucide="check"></i> 儲存 VJW 欄位</button>
     </div>
+
+    <div class="modal-footer">
+      <button type="button"
+              class="btn-solid-primary"
+              onclick="closeDatePickerModal()">
+        完成
+      </button>
+    </div>
+
   </div>
 </div>
+
+<!-- 4. VJW Edit Modal -->
 
 <!-- 5. Companion Members Management Modal -->
 <div class="modal-overlay" id="memberModal">
@@ -2594,8 +2611,44 @@ function renderAppAll() {
   renderSettlementDashboard();
   initLucideIcons();
 }
+function editTripDestination() {
+  const result = window.prompt(
+    "請輸入旅遊目的地：",
+    tripInfo.destination || ""
+  );
 
+  // 按取消時不修改
+  if (result === null) return;
+
+  const destination = result.trim();
+
+  if (!destination) {
+    showToast("目的地不能留空", "⚠️");
+    return;
+  }
+
+  if (destination.length > 200) {
+    showToast("目的地請控制在 200 字以內", "⚠️");
+    return;
+  }
+
+  // 更新實際資料
+  tripInfo.destination = destination;
+
+  // 更新畫面
+  renderHeaderAndMetrics();
+
+  showToast("畫面上的目的地已更新");
+
+  // 沿用現有的草稿與 Firebase 儲存流程
+  persistState();
+}
 function renderHeaderAndMetrics() {
+   const destinationEl = document.getElementById('displayTripDestination');
+
+  if (destinationEl) {
+    destinationEl.textContent = tripInfo.destination || "尚未設定目的地";
+  }
   const datesSummary = document.getElementById('tripDatesSummary');
   if (datesSummary) {
     datesSummary.textContent = `${tripInfo.startDate} ~ ${tripInfo.endDate} (${days.length}天)`;
@@ -2780,7 +2833,7 @@ function applyNewDateRange(startStr, endStr) {
   days = newDays;
   if (activeDay > diffDays) activeDay = 1;
 
-  closeDatePickerModal();
+ 
   renderAppAll();
   persistState();
   showToast(`行程日期已更新：共 ${diffDays} 天！`);
@@ -2815,7 +2868,9 @@ function renderDayTabs() {
   if (curDayObj) {
     const titleEl = document.getElementById('currentDayTitle');
     const dateEl = document.getElementById('currentDayDateText');
-    if (titleEl) titleEl.textContent = curDayObj.title;
+    if (titleEl) {
+  titleEl.textContent = `Day ${curDayObj.dayNumber}`;
+  }
     if (dateEl) dateEl.textContent = `${curDayObj.date} · 天氣狀況：${curDayObj.weather || "氣候舒適"}`;
   }
 }
@@ -2958,7 +3013,7 @@ function openSpotModal(spotId) {
   days.forEach(d => {
     const opt = document.createElement('option');
     opt.value = d.dayNumber;
-    opt.textContent = `Day ${d.dayNumber} (${d.date ? d.date.substring(5) : ''}) - ${d.title}`;
+    opt.textContent = `Day ${d.dayNumber} (${d.date ? d.date.substring(5) : ''}) `;
     daySelect.appendChild(opt);
   });
 
