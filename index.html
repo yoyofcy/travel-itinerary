@@ -1418,7 +1418,7 @@
           <span>·</span>
           <span id="tripDatesSummary">2027/01/15 ~ 01/21 (7天)</span>
         </div>
-        <h1 class="brand-title">日本東京・富士山<em>冬日遊</em></h1>
+        <h1 class="brand-title" id="tripDestinationTitle" ></h1>
       </div>
       <div class="header-actions">
         <button class="btn-icon-soft" id="btnSyncInfo" title="Firebase 雲端連線設定" onclick="openSyncModal()">
@@ -2653,6 +2653,12 @@ function editTripDestination() {
   persistState();
 }
 function renderHeaderAndMetrics() {
+    const destinationTitle = document.getElementById('tripDestinationTitle');
+
+  if (destinationTitle) {
+    const destination = tripInfo.destination || "旅遊";
+    destinationTitle.textContent = `${destination}${days.length}日遊`;
+  }
    const destinationEl = document.getElementById('displayTripDestination');
 
   if (destinationEl) {
