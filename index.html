@@ -2540,6 +2540,9 @@ document.addEventListener("DOMContentLoaded", async function() {
   initLucideIcons();
   renderAppAll();
   
+  window.travelAppReady = true;
+  document.dispatchEvent(new Event("travel-app-ready"));
+  
   if (window.notebookAppApi && window.notebookAppApi.notifyAppReady) {
     window.notebookAppApi.notifyAppReady();
   }
@@ -4556,7 +4559,7 @@ window.tripCloud = (() => {
     );
   }
 
-  async function connect() {
+  async function connect(automatic = false) {
     try {
       const user = getUser();
       const code = getCode();
@@ -4564,11 +4567,6 @@ window.tripCloud = (() => {
       if (saving || pendingPayload) {
         throw new Error("正在儲存，請稍後再切換或重新連線。");
       }
-
-      if (!confirm(
-        "連線後會以雲端資料取代目前畫面。\n" +
-        "如有未同步修改，請先匯出 JSON 備份。\n\n是否繼續？"
-      )) return;
 
       disconnect();
       const token = generation;
@@ -4593,6 +4591,16 @@ window.tripCloud = (() => {
       acceptSnapshot(initial);
       connected = true;
 
+      // 每個 Google 帳號分別記住上次成功連線的行程
+      try {
+        localStorage.setItem(
+          "travel-last-trip:" + user.uid,
+          code
+        );
+      } catch (error) {
+        console.warn("瀏覽器無法記住行程代碼：", error);
+      }
+      
       badge("雲端已連線：" + code);
       message("已讀取雲端資料。修改後將自動儲存；圖片不在同步範圍內。");
 
@@ -4842,10 +4850,11 @@ window.tripCloud = (() => {
   }
 
   // 登出或換帳號後，不保留上一個帳號的行程畫面。
+  // 登入狀態恢復後，自動連線上次使用的行程。
   let previousUid = null;
 
   if (travelAuth) {
-    travelAuth.onAuthStateChanged(user => {
+    travelAuth.onAuthStateChanged(async user => {
       const nextUid = user ? user.uid : null;
 
       if (previousUid && previousUid !== nextUid) {
@@ -4855,6 +4864,53 @@ window.tripCloud = (() => {
       }
 
       previousUid = nextUid;
+
+      if (!user) return;
+
+      // 記錄目前操作版本，避免等待期間干擾手動連線。
+      const restoreGeneration = generation;
+
+      // 等待原本的畫面初始化完成。
+      if (!window.travelAppReady) {
+        await new Promise(resolve => {
+          document.addEventListener(
+            "travel-app-ready",
+            resolve,
+            { once: true }
+          );
+        });
+      }
+
+      // 等待期間若已換帳號或開始其他連線操作，就不自動介入。
+      if (
+        !travelAuth.currentUser ||
+        travelAuth.currentUser.uid !== user.uid ||
+        generation !== restoreGeneration ||
+        connected ||
+        saving
+      ) {
+        return;
+      }
+
+      let savedCode = "";
+
+      try {
+        savedCode = localStorage.getItem(
+          "travel-last-trip:" + user.uid
+        ) || "";
+      } catch (error) {
+        console.warn("無法讀取上次行程：", error);
+      }
+
+      if (!/^[A-Za-z0-9_-]{4,60}$/.test(savedCode)) {
+        return;
+      }
+
+      $("inputTripCode").value = savedCode;
+      message("正在自動連線上次使用的行程：" + savedCode);
+      badge("正在自動連線……");
+
+      await connect(true);
     });
   }
 
