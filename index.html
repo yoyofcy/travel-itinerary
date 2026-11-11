@@ -11,7 +11,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+  
+  <!-- Firebase：三個檔案使用相同版本 -->
+  <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
+  
   <!-- Chart.js and Lucide Icons (Exact Pinned Versions) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/lucide@1.43.0/dist/umd/lucide.min.js"></script>
@@ -1227,6 +1232,53 @@
       </p>
 
       <div style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm);">
+              <!-- 真正的 Firebase Google 登入 -->
+      <div style="background: var(--surface-white); border: 1px solid var(--outline-variant); border-radius: var(--rounded); padding: 12px; margin-bottom: 12px;">
+
+        <strong>Google 帳號登入</strong>
+
+        <p id="firebaseLoginStatus"
+           style="font-size: 0.82rem; margin: 8px 0;">
+          正在初始化登入服務……
+        </p>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button"
+                  id="btnFirebaseLogin"
+                  class="btn-solid-primary"
+                  onclick="loginWithGoogle()">
+            使用 Google 登入
+          </button>
+
+          <button type="button"
+                  id="btnFirebaseLogout"
+                  class="btn-outline"
+                  onclick="logoutFirebase()"
+                  style="display: none;">
+            登出
+          </button>
+        </div>
+
+        <div id="firebaseUidPanel"
+             style="display: none; margin-top: 12px;">
+          <label class="form-label" for="firebaseUidOutput">
+            你的 Firebase 使用者 UID
+          </label>
+
+          <input id="firebaseUidOutput"
+                 class="form-input"
+                 type="text"
+                 readonly
+                 style="width: 100%; margin-top: 4px;"
+                 onclick="this.select()">
+
+          <p style="font-size: 0.75rem; margin-bottom: 0;">
+            UID 用來設定行程存取權限，不是密碼。
+            目前只完成登入，尚未啟用資料庫同步。
+          </p>
+        </div>
+      </div>
+        
         <input type="text" id="inputTripCode" class="form-input" style="flex: 1;" placeholder="輸入連線行程代碼 (例如: TOKYO2027)" value="TOKYO2027-WINTER">
         <button class="btn-solid-primary" onclick="connectTripSync()"><i data-lucide="radio"></i> 連線同步</button>
       </div>
@@ -2062,12 +2114,13 @@ let categoryChartInstance = null;
 
 // Firebase Config Default (Requirement 8)
 let firebaseConfig = {
-  apiKey: "AIzaSyC07_TravelAppExampleDemoKey",
-  authDomain: "travel-app-2027.firebaseapp.com",
-  projectId: "travel-app-2027",
-  storageBucket: "travel-app-2027.appspot.com",
-  messagingSenderId: "9821457190",
-  appId: "1:9821457190:web:8a9b2c3d4e5f"
+  apiKey: "AIzaSyDwh1_16v8ItopcY5lefl_KQXBmNGQhvUI",
+  authDomain: "travel-itinerary-918b6.firebaseapp.com",
+  projectId: "travel-itinerary-918b6",
+  storageBucket: "travel-itinerary-918b6.firebasestorage.app",
+  messagingSenderId: "33609276065",
+  appId: "1:33609276065:web:def0e10ac79c91ba616ee0",
+  measurementId: "G-Y13JM35P8J"
 };
 
 // ================= INITIALIZATION =================
@@ -3538,19 +3591,10 @@ function removeMember(idx) {
 
 // ================= REQUIREMENT 8: FIREBASE & GITHUB PAGES SYNC =================
 function connectTripSync() {
-  const code = document.getElementById('inputTripCode').value.trim();
-  if (!code) {
-    showToast("請輸入行程代碼", "⚠️");
-    return;
-  }
-  tripInfo.tripCode = code;
-  const badge = document.getElementById('cloudStatusBadge');
-  if (badge) {
-    badge.textContent = `🔥 已連線 (${code})`;
-    badge.className = "badge-terracotta";
-  }
-  persistState();
-  showToast(`Firebase 行程代碼 [${code}] 已連線同步就緒！`);
+  showToast(
+    "目前先完成 Google 登入；資料庫同步尚未設定，請勿把此按鈕視為連線成功。",
+    "ℹ️"
+  );
 }
 
 function openFirebaseConfigModal() {
@@ -3684,6 +3728,129 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 </script>
+<script>
+  // ===== Firebase 真正的初始化與 Google 登入 =====
+  let travelFirebaseApp = null;
+  let travelAuth = null;
 
+  function showFirebaseAuthError(error) {
+    console.error("Firebase 登入錯誤：", error);
+
+    const messages = {
+      "auth/unauthorized-domain":
+        "此網站網域尚未授權。請在 Authentication → 設定 → 已授權網域加入 yoyofcy.github.io。",
+      "auth/operation-not-allowed":
+        "尚未啟用 Google 登入。請到 Authentication → 登入方式啟用 Google。",
+      "auth/popup-blocked":
+        "瀏覽器封鎖了登入視窗，請允許此網站開啟彈出式視窗後再試。",
+      "auth/popup-closed-by-user":
+        "登入視窗已關閉，尚未完成登入。",
+      "auth/cancelled-popup-request":
+        "登入視窗已在開啟中，請勿連續點擊。",
+      "auth/network-request-failed":
+        "網路連線失敗，請確認網路後重試。",
+      "auth/invalid-api-key":
+        "Firebase API Key 無效，請確認設定是否完整複製。"
+    };
+
+    const code = error && error.code ? error.code : "unknown";
+    const message = messages[code] ||
+      ("登入失敗：" + code + "。請查看瀏覽器 Console 的詳細訊息。");
+
+    const status = document.getElementById("firebaseLoginStatus");
+    if (status) status.textContent = message;
+
+    showToast(message, "⚠️");
+  }
+
+  function initializeTravelFirebaseAuth() {
+    const status = document.getElementById("firebaseLoginStatus");
+
+    if (!window.firebase) {
+      status.textContent =
+        "Firebase 程式庫未載入，請確認第 1 處的三行 script 與網路連線。";
+      return;
+    }
+
+    try {
+      travelFirebaseApp = firebase.initializeApp(
+        firebaseConfig,
+        "travel-itinerary-app"
+      );
+
+      travelAuth = travelFirebaseApp.auth();
+
+      travelAuth.onAuthStateChanged(function(user) {
+        const loginButton = document.getElementById("btnFirebaseLogin");
+        const logoutButton = document.getElementById("btnFirebaseLogout");
+        const uidPanel = document.getElementById("firebaseUidPanel");
+        const uidOutput = document.getElementById("firebaseUidOutput");
+        const badge = document.getElementById("cloudStatusBadge");
+
+        loginButton.style.display = user ? "none" : "inline-flex";
+        logoutButton.style.display = user ? "inline-flex" : "none";
+        uidPanel.style.display = user ? "block" : "none";
+
+        if (user) {
+          status.textContent =
+            "已登入：" + (user.email || user.displayName || user.uid);
+
+          uidOutput.value = user.uid;
+
+          if (badge) {
+            badge.textContent = "已登入，尚未連線資料庫";
+            badge.className = "badge-sand";
+          }
+        } else {
+          status.textContent = "尚未登入，請按「使用 Google 登入」。";
+          uidOutput.value = "";
+
+          if (badge) {
+            badge.textContent = "尚未登入／尚未同步";
+            badge.className = "badge-sand";
+          }
+        }
+      }, showFirebaseAuthError);
+
+    } catch (error) {
+      showFirebaseAuthError(error);
+    }
+  }
+
+  async function loginWithGoogle() {
+    if (!travelAuth) {
+      showToast("登入服務尚未初始化，請查看登入區的錯誤訊息。", "⚠️");
+      return;
+    }
+
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+
+      provider.setCustomParameters({
+        prompt: "select_account"
+      });
+
+      await travelAuth.signInWithPopup(provider);
+
+      showToast("Google 登入成功！目前尚未啟用資料庫同步。");
+    } catch (error) {
+      showFirebaseAuthError(error);
+    }
+  }
+
+  async function logoutFirebase() {
+    if (!travelAuth) return;
+
+    try {
+      await travelAuth.signOut();
+      showToast("已登出 Google 帳號");
+    } catch (error) {
+      showFirebaseAuthError(error);
+    }
+  }
+
+  initializeTravelFirebaseAuth();
+</script>
+  
 </body>
 </html>
