@@ -1431,7 +1431,7 @@
         <span class="badge-sand">靜態無後端架構</span>
       </div>
       <p style="font-size: 0.8rem; color: var(--on-surface-variant); margin-top: -4px;">
-        支援直接部署於 <strong>GitHub Pages</strong> 靜態託管。多位旅伴開啟相同網址並輸入相同的「行程代碼」，即可透過 Firebase 雲端資料庫保持資料即時同步。
+        支援直接部署於 <strong>GitHub Pages</strong> 靜態託管。旅伴使用 Google 登入後，輸入行程代碼並申請加入。經管理員核准後，即可共同編輯與同步。
       </p>
 
       <div style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm);">
@@ -1478,7 +1478,7 @@
              onclick="this.select()">
 
       <p style="font-size: 0.7rem; margin-bottom: 0;">
-        UID 僅供設定權限使用；資料尚未同步。
+        UID 用於辨識帳號。資料同步狀態請查看雲端連線提示。
       </p>
     </div>
   </div>
@@ -1505,7 +1505,52 @@
       </button>
     </div>
   </div>
+<!-- 行程建立、加入與管理 -->
+<div class="box-card" style="margin-top: 12px;">
+  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+    <button type="button"
+            class="btn-outline"
+            onclick="tripCloud.createTrip()">
+      建立新行程
+    </button>
 
+    <button type="button"
+            class="btn-outline"
+            onclick="tripCloud.requestJoin()">
+      申請加入
+    </button>
+
+    <button type="button"
+            class="btn-outline"
+            onclick="tripCloud.downloadDraft()">
+      下載本機草稿備份
+    </button>
+  </div>
+
+  <p id="tripCloudMessage"
+     style="font-size: 0.8rem; overflow-wrap: anywhere;">
+    尚未連線。新旅伴請申請加入；已核准成員請按連線同步。
+  </p>
+
+  <div id="tripAdminPanel" style="display: none;">
+    <hr>
+
+    <strong>待核准加入申請</strong>
+    <div id="tripJoinRequests"
+         style="margin-top: 8px;"></div>
+
+    <hr>
+
+    <strong>已核准的同步成員</strong>
+    <p style="font-size: 0.75rem;">
+      管理員本人不列在下方。移除成員會停止其後續雲端存取，
+      但不能收回對方已下載的資料。
+    </p>
+
+    <div id="tripApprovedMembers"></div>
+  </div>
+</div>
+  
 </div>
 
       <div style="background: var(--surface-white); border: 1px solid var(--outline-light); border-radius: var(--rounded); padding: 8px 10px; font-size: 0.76rem; color: var(--on-surface-variant);">
@@ -2365,56 +2410,18 @@ function initLucideIcons() {
   }
 }
 
-// ================= STATE PERSISTENCE (Shim API) =================
+// ================= STATE PERSISTENCE =================
+
 async function loadSavedState() {
-  try {
-    if (window.notebookAppApi && window.notebookAppApi.getAppState) {
-      const saved = await window.notebookAppApi.getAppState();
-      if (saved) {
-        if (saved.tripInfo) tripInfo = saved.tripInfo;
-        if (saved.members && saved.members.length) members = saved.members;
-        if (saved.vjwData) vjwData = saved.vjwData;
-        if (saved.days && saved.days.length) days = saved.days;
-        if (saved.spots && saved.spots.length) spots = saved.spots;
-        if (saved.packingItems && saved.packingItems.length) packingItems = saved.packingItems;
-        if (saved.expenses && saved.expenses.length) expenses = saved.expenses;
-        if (saved.firebaseConfig) firebaseConfig = saved.firebaseConfig;
-      }
-    }
-  } catch (err) {
-    console.warn("Could not load state:", err);
-  }
+  // 登入後按「連線同步」，才從 Firebase 讀取行程。
 }
 
 async function persistState() {
-  try {
-    if (window.notebookAppApi && window.notebookAppApi.setAppState) {
-      // Create clean state with NO data:image raster binaries as per requirements
-      const cleanSpots = spots.map(s => {
-        const copy = Object.assign({}, s);
-        // Do not store large base64 or blob strings in setAppState
-        if (copy.voucherImage && copy.voucherImage.startsWith('data:image')) {
-          copy.voucherImage = 'uploaded_custom_image';
-        }
-        return copy;
-      });
-
-      const statePayload = {
-        tripInfo: tripInfo,
-        members: members,
-        vjwData: vjwData,
-        days: days,
-        spots: cleanSpots,
-        packingItems: packingItems,
-        expenses: expenses,
-        firebaseConfig: firebaseConfig
-      };
-      await window.notebookAppApi.setAppState(statePayload);
-    }
-  } catch (err) {
-    console.warn("Could not persist state:", err);
+  if (window.tripCloud) {
+    window.tripCloud.save();
   }
 }
+
 
 // ================= NAVIGATION & TAB SWITCHING (Requirement 3) =================
 function switchTab(tabId) {
@@ -3815,13 +3822,14 @@ function removeMember(idx) {
 }
 
 // ================= REQUIREMENT 8: FIREBASE & GITHUB PAGES SYNC =================
-function connectTripSync() {
-  showToast(
-    "目前先完成 Google 登入；資料庫同步尚未設定，請勿把此按鈕視為連線成功。",
-    "ℹ️"
-  );
+async function connectTripSync() {
+  if (window.tripCloud) {
+    await window.tripCloud.connect();
+  } else {
+    showToast("同步程式尚未載入", "⚠️");
+  }
 }
-
+  
 function openFirebaseConfigModal() {
   document.getElementById('fbApiKey').value = firebaseConfig.apiKey || "";
   document.getElementById('fbAuthDomain').value = firebaseConfig.authDomain || "";
@@ -4075,6 +4083,611 @@ function escapeHtml(str) {
   }
 
   initializeTravelFirebaseAuth();
+</script>
+<script>
+window.tripCloud = (() => {
+  let db = null;
+  let currentCode = "";
+  let stateRef = null;
+  let revision = 0;
+
+  let generation = 0;
+  let connected = false;
+  let saving = false;
+  let pendingPayload = null;
+  let unsubscribers = [];
+  let lastDraftKey = "";
+
+  const $ = id => document.getElementById(id);
+
+  function message(text) {
+    const el = $("tripCloudMessage");
+    if (el) el.textContent = text;
+  }
+
+  function badge(text) {
+    const el = $("cloudStatusBadge");
+    if (el) {
+      el.textContent = text;
+      el.className = "badge-sand";
+    }
+  }
+
+  function getUser() {
+    if (!travelAuth || !travelAuth.currentUser) {
+      throw new Error("請先使用 Google 登入。");
+    }
+
+    if (!db) db = travelFirebaseApp.firestore();
+
+    return travelAuth.currentUser;
+  }
+
+  function getCode() {
+    const code = $("inputTripCode").value.trim();
+
+    if (!/^[A-Za-z0-9_-]{4,60}$/.test(code)) {
+      throw new Error(
+        "行程代碼請使用 4～60 個英文字母、數字、底線或減號。大小寫有別。"
+      );
+    }
+
+    return code;
+  }
+
+  function report(error) {
+    console.error(error);
+
+    let text = error.message || String(error);
+
+    if (error.code === "permission-denied") {
+      text =
+        "沒有權限，或行程代碼已被使用。新旅伴請申請加入；" +
+        "管理員請確認 Firebase 規則已發布。";
+    }
+
+    message(text);
+    showToast(text, "⚠️");
+  }
+
+  function disconnect() {
+    generation++;
+
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe();
+    }
+
+    unsubscribers = [];
+    connected = false;
+    stateRef = null;
+    pendingPayload = null;
+    currentCode = "";
+
+    if ($("tripAdminPanel")) {
+      $("tripAdminPanel").style.display = "none";
+    }
+
+    badge("尚未連線資料庫");
+  }
+
+  function rawPayload() {
+    return JSON.parse(JSON.stringify({
+      tripInfo,
+      members,
+      vjwData,
+      days,
+      spots,
+      packingItems,
+      expenses
+    }));
+  }
+
+  function cloudPayload(code) {
+    const data = rawPayload();
+    data.tripInfo.tripCode = code;
+
+    // 本版只同步文字；不把圖片 Base64 塞進 Firestore。
+    data.spots = data.spots.map(spot => {
+      if (
+        typeof spot.voucherImage === "string" &&
+        (
+          spot.voucherImage.startsWith("data:") ||
+          spot.voucherImage.startsWith("blob:")
+        )
+      ) {
+        spot.voucherImage = "";
+        spot.hasVoucher = Boolean(spot.voucherCode);
+      }
+      return spot;
+    });
+
+    // 單文件版本保留容量餘裕。
+    const bytes = new TextEncoder().encode(JSON.stringify(data)).length;
+
+    if (bytes > 800000) {
+      throw new Error(
+        "此行程資料過大，暫停同步。請先匯出備份；需要改為分文件儲存。"
+      );
+    }
+
+    return data;
+  }
+
+  function backupDraft(code) {
+    const user = getUser();
+
+    lastDraftKey =
+      "travel-draft:" + user.uid + ":" + code;
+
+    const data = rawPayload();
+    data.tripInfo.tripCode = code;
+
+    try {
+      sessionStorage.setItem(lastDraftKey, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.warn("草稿備份失敗：", error);
+      return false;
+    }
+  }
+
+  function applyPayload(data, code) {
+    if (!data || !data.tripInfo || !Array.isArray(data.days)) {
+      throw new Error("雲端資料格式不完整，未載入。");
+    }
+
+    tripInfo = {...data.tripInfo, tripCode: code};
+    members = data.members;
+    vjwData = data.vjwData;
+    days = data.days;
+    spots = data.spots;
+    packingItems = data.packingItems;
+    expenses = data.expenses;
+
+    if (!days.some(day => day.dayNumber === activeDay)) {
+      activeDay = days.length ? days[0].dayNumber : 1;
+    }
+
+    $("inputTripCode").value = code;
+    renderAppAll();
+  }
+
+  function acceptSnapshot(snapshot) {
+    if (!snapshot.exists) {
+      throw new Error("找不到行程資料文件。");
+    }
+
+    const data = snapshot.data();
+
+    if (!Number.isInteger(data.revision)) {
+      throw new Error("雲端資料缺少版本號。");
+    }
+
+    if (data.revision >= revision) {
+      revision = data.revision;
+      applyPayload(data.payload, currentCode);
+    }
+  }
+
+  function makeButton(text, action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-outline";
+    button.textContent = text;
+    button.style.margin = "4px";
+    button.onclick = async () => {
+      button.disabled = true;
+      try {
+        await action();
+      } catch (error) {
+        report(error);
+      } finally {
+        button.disabled = false;
+      }
+    };
+    return button;
+  }
+
+  function watchAdmin(tripRef, code) {
+    $("tripAdminPanel").style.display = "block";
+
+    unsubscribers.push(
+      tripRef.collection("joinRequests").onSnapshot(snapshot => {
+        const container = $("tripJoinRequests");
+        container.replaceChildren();
+
+        if (snapshot.empty) {
+          container.textContent = "目前沒有待核准申請。";
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const request = doc.data();
+          const row = document.createElement("div");
+          row.style.cssText =
+            "padding:8px 0;border-bottom:1px solid #ddd;" +
+            "overflow-wrap:anywhere;";
+
+          const label = document.createElement("div");
+          label.textContent =
+            (request.displayName || "未提供姓名") +
+            "／" + (request.email || doc.id);
+
+          row.appendChild(label);
+
+          row.appendChild(makeButton("核准", async () => {
+            const batch = db.batch();
+
+            batch.set(
+              tripRef.collection("members").doc(doc.id),
+              {
+                role: "editor",
+                addedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }
+            );
+
+            batch.delete(doc.ref);
+            await batch.commit();
+            showToast("已核准加入 " + code);
+          }));
+
+          row.appendChild(makeButton("拒絕", async () => {
+            await doc.ref.delete();
+            showToast("已刪除這筆申請");
+          }));
+
+          container.appendChild(row);
+        });
+      }, report)
+    );
+
+    unsubscribers.push(
+      tripRef.collection("members").onSnapshot(snapshot => {
+        const container = $("tripApprovedMembers");
+        container.replaceChildren();
+
+        if (snapshot.empty) {
+          container.textContent = "目前尚未核准其他帳號。";
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const row = document.createElement("div");
+          row.style.cssText = "padding:8px 0;overflow-wrap:anywhere;";
+
+          const label = document.createElement("div");
+          label.textContent = "成員 UID：" + doc.id;
+          row.appendChild(label);
+
+          row.appendChild(makeButton("移除權限", async () => {
+            if (!confirm("確定要移除此帳號的行程存取權限？")) return;
+            await doc.ref.delete();
+            showToast("已移除成員權限");
+          }));
+
+          container.appendChild(row);
+        });
+      }, report)
+    );
+  }
+
+  async function connect() {
+    try {
+      const user = getUser();
+      const code = getCode();
+
+      if (saving || pendingPayload) {
+        throw new Error("正在儲存，請稍後再切換或重新連線。");
+      }
+
+      if (!confirm(
+        "連線後會以雲端資料取代目前畫面。\n" +
+        "如有未同步修改，請先匯出 JSON 備份。\n\n是否繼續？"
+      )) return;
+
+      disconnect();
+      const token = generation;
+
+      const tripRef = db.collection("trips").doc(code);
+
+      const meta = await tripRef.get({source: "server"});
+      if (token !== generation) return;
+
+      if (!meta.exists) {
+        throw new Error("行程不存在，請先建立行程。");
+      }
+
+      const ref = tripRef.collection("state").doc("main");
+      const initial = await ref.get({source: "server"});
+      if (token !== generation) return;
+
+      currentCode = code;
+      stateRef = ref;
+      revision = -1;
+
+      acceptSnapshot(initial);
+      connected = true;
+
+      badge("雲端已連線：" + code);
+      message("已讀取雲端資料。修改後將自動儲存；圖片不在同步範圍內。");
+
+      unsubscribers.push(
+        ref.onSnapshot(snapshot => {
+          if (
+            token !== generation ||
+            snapshot.metadata.hasPendingWrites ||
+            snapshot.metadata.fromCache ||
+            saving ||
+            pendingPayload
+          ) return;
+
+          try {
+            acceptSnapshot(snapshot);
+          } catch (error) {
+            disconnect();
+            report(error);
+          }
+        }, error => {
+          if (token !== generation) return;
+          disconnect();
+          report(error);
+        })
+      );
+
+      if (meta.data().ownerUid === user.uid) {
+        watchAdmin(tripRef, code);
+      }
+
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  async function createTrip() {
+    try {
+      const user = getUser();
+      const code = getCode();
+
+      if (saving || pendingPayload) {
+        throw new Error("正在儲存，請稍後再建立行程。");
+      }
+
+      if (!confirm(
+        "將用目前畫面的行程、帳目與清單建立新行程。\n" +
+        "圖片不會上傳；請先匯出完整備份。\n\n確定建立 " + code + "？"
+      )) return;
+
+      const payload = cloudPayload(code);
+      backupDraft(code);
+
+      const tripRef = db.collection("trips").doc(code);
+      const batch = db.batch();
+      const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+
+      batch.set(tripRef, {
+        ownerUid: user.uid,
+        createdAt: timestamp
+      });
+
+      batch.set(tripRef.collection("state").doc("main"), {
+        payload,
+        revision: 0,
+        updatedAt: timestamp
+      });
+
+      // 若代碼已存在，規則會阻止覆蓋管理員資料，整批失敗。
+      await batch.commit();
+
+      showToast("行程建立成功，你是管理員！");
+      await connect();
+
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  async function requestJoin() {
+    try {
+      const user = getUser();
+      const code = getCode();
+
+      if (saving || pendingPayload) {
+        throw new Error("正在儲存，請稍後再申請其他行程。");
+      }
+
+      disconnect();
+      const token = generation;
+      const tripRef = db.collection("trips").doc(code);
+
+      await tripRef.collection("joinRequests").doc(user.uid).set({
+        uid: user.uid,
+        email: user.email,
+        displayName: (user.displayName || "").slice(0, 100),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      if (token !== generation) return;
+
+      message("申請已送出，請等待行程管理員核准。");
+      showToast("已送出加入申請");
+
+      // 允許使用者監聽自己的成員資格。
+      unsubscribers.push(
+        tripRef.collection("members").doc(user.uid)
+          .onSnapshot(snapshot => {
+            if (token !== generation || !snapshot.exists) return;
+
+            $("inputTripCode").value = code;
+            message("已核准！請確認讀取雲端行程。");
+            connect();
+          }, report)
+      );
+
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  function save() {
+    try {
+      const user = getUser();
+      const code = currentCode || getCode();
+
+      const backedUp = backupDraft(code);
+
+      if (!connected || !stateRef) {
+        badge("尚未同步");
+        message(
+          backedUp
+            ? "尚未連線；修改只暫存在本分頁草稿。請先連線或建立行程。"
+            : "尚未連線且草稿備份失敗，請立即用右上角下載 JSON 備份。"
+        );
+        return;
+      }
+
+      pendingPayload = cloudPayload(currentCode);
+      badge("正在儲存……");
+
+      if (!saving) pump();
+
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  async function pump() {
+    if (saving || !connected || !stateRef) return;
+
+    saving = true;
+    const token = generation;
+    const ref = stateRef;
+
+    try {
+      while (pendingPayload && token === generation) {
+        const payload = pendingPayload;
+        pendingPayload = null;
+        const expectedRevision = revision;
+
+        await db.runTransaction(async transaction => {
+          const snapshot = await transaction.get(ref);
+
+          if (
+            !snapshot.exists ||
+            snapshot.data().revision !== expectedRevision
+          ) {
+            throw new Error(
+              "另一位旅伴已先修改資料，為避免覆蓋，已停止本次同步。" +
+              "請下載本機草稿備份，再重新連線核對後修改。"
+            );
+          }
+
+          transaction.update(ref, {
+            payload,
+            revision: expectedRevision + 1,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        });
+
+        if (token !== generation) return;
+        revision = expectedRevision + 1;
+      }
+
+      if (token === generation) {
+        badge("已儲存至雲端");
+        message("最新修改已由 Firestore 確認儲存。");
+      }
+
+    } catch (error) {
+      if (token === generation) {
+        disconnect();
+        report(error);
+      }
+
+    } finally {
+      saving = false;
+
+      if (connected && pendingPayload) {
+        pump();
+      } else if (connected && token === generation) {
+        // 補讀儲存期間可能略過的其他成員更新。
+        ref.get({source: "server"}).then(snapshot => {
+          if (
+            connected &&
+            token === generation &&
+            !saving &&
+            !pendingPayload
+          ) {
+            acceptSnapshot(snapshot);
+          }
+        }).catch(report);
+      }
+    }
+  }
+
+  function downloadDraft() {
+    try {
+      const user = getUser();
+      const code = getCode();
+      const key = "travel-draft:" + user.uid + ":" + code;
+
+      const text = sessionStorage.getItem(key);
+
+      if (!text) {
+        throw new Error(
+          "本分頁沒有這份行程的草稿；目前畫面可用右上角下載圖示匯出。"
+        );
+      }
+
+      const url = URL.createObjectURL(
+        new Blob([text], {type: "application/json"})
+      );
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = code + "-local-draft.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  // 登出或換帳號後，不保留上一個帳號的行程畫面。
+  let previousUid = null;
+
+  if (travelAuth) {
+    travelAuth.onAuthStateChanged(user => {
+      const nextUid = user ? user.uid : null;
+
+      if (previousUid && previousUid !== nextUid) {
+        disconnect();
+        location.reload();
+        return;
+      }
+
+      previousUid = nextUid;
+    });
+  }
+
+  window.addEventListener("beforeunload", event => {
+    if (saving || pendingPayload) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
+
+  return {
+    connect,
+    createTrip,
+    requestJoin,
+    save,
+    downloadDraft
+  };
+})();
 </script>
   
 </body>
