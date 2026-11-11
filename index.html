@@ -1091,6 +1091,151 @@
         scroll-behavior: auto !important;
       }
     }
+
+    /* ===== 手機版：Firebase 登入、行程代碼與憑證排版修正 ===== */
+
+/* 防止輸入框、狀態文字把卡片撐寬 */
+#tab-directory .box-card,
+#firebaseUidPanel {
+  min-width: 0;
+}
+
+#firebaseLoginStatus {
+  overflow-wrap: anywhere;
+}
+
+#firebaseUidPanel {
+  margin-top: 8px !important;
+}
+
+#firebaseUidPanel .form-label {
+  display: block;
+  font-size: 0.72rem;
+}
+
+#firebaseUidPanel p {
+  font-size: 0.7rem !important;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+/* UID 是識別碼，不需要佔很高的空間 */
+#firebaseUidOutput {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 6px 8px;
+  border-color: var(--outline-variant);
+  background: var(--surface-container-low);
+}
+
+/* 行程代碼輸入框可以縮小，避免擠出按鈕 */
+#inputTripCode {
+  min-width: 0;
+  width: 0;
+  max-width: 100%;
+}
+
+/* 預約／憑證代碼輸入框不要超出彈窗 */
+#spotVoucherCodeInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 長預約代碼可以換行，避免撐開整張卡片 */
+.voucher-banner-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.voucher-banner-text > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.voucher-banner-text > svg {
+  flex-shrink: 0;
+}
+
+/* 只調整手機尺寸 */
+@media (max-width: 600px) {
+  /* 標題和狀態標籤空間不足時換行 */
+  #tab-directory .box-card-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  #tab-directory .card-title {
+    min-width: 0;
+    flex-wrap: wrap;
+    font-size: 1rem;
+  }
+
+  #cloudStatusBadge {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 0.65rem;
+  }
+
+  /* 登入、登出按鈕保持緊湊且不超出卡片 */
+  #btnFirebaseLogin,
+  #btnFirebaseLogout {
+    justify-content: center;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    white-space: normal;
+  }
+
+  /* 行程代碼右側的連線按鈕 */
+  #inputTripCode + button {
+    flex-shrink: 0;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  #inputTripCode + button svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  /* 16px 可避免 iPhone 點輸入框時自動放大 */
+  #inputTripCode,
+  #firebaseUidOutput,
+  #spotVoucherCodeInput {
+    font-size: 16px;
+  }
+
+  /* 憑證區的說明及標籤可換行 */
+  .voucher-banner-btn {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 憑證上傳／移除按鈕不要擠出畫面 */
+  .voucher-upload-panel > div:last-child {
+    flex-wrap: wrap;
+  }
+
+  .voucher-upload-panel button {
+    justify-content: center;
+    max-width: 100%;
+    white-space: normal;
+    font-size: 0.8rem;
+  }
+}
   </style>
 </head>
 <body>
@@ -1273,8 +1418,7 @@
                  onclick="this.select()">
 
           <p style="font-size: 0.75rem; margin-bottom: 0;">
-            UID 用來設定行程存取權限，不是密碼。
-            目前只完成登入，尚未啟用資料庫同步。
+            UID 僅供設定權限使用；資料尚未同步。
           </p>
         </div>
       </div>
