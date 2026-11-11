@@ -2928,7 +2928,25 @@ function renderTimelineSpots() {
   if (!list) return;
   list.innerHTML = "";
 
-  const daySpots = spots.filter(s => s.dayNumber === activeDay);
+    const daySpots = spots
+    .filter(s => s.dayNumber === activeDay)
+    .sort((a, b) => {
+      const toMinutes = time => {
+        if (!time) return Infinity;
+
+        const [hours, minutes] = time.split(":").map(Number);
+
+        return Number.isFinite(hours) && Number.isFinite(minutes)
+          ? hours * 60 + minutes
+          : Infinity;
+      };
+
+      const timeA = toMinutes(a.time);
+      const timeB = toMinutes(b.time);
+
+      if (timeA === timeB) return 0;
+      return timeA < timeB ? -1 : 1;
+    });
 
   if (daySpots.length === 0) {
     list.innerHTML = `
