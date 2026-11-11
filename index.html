@@ -1293,7 +1293,107 @@
   .firebase-trip-code-row > button {
     width: 100%;
   }
-}    
+} 
+    /* ===== Firebase 區塊：所有操作固定垂直排列 ===== */
+
+.firebase-vertical-panel {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 標題與標籤也分行 */
+.firebase-vertical-panel .firebase-vertical-heading {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.firebase-vertical-panel .firebase-vertical-heading .card-title {
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+/* 每個功能區塊各佔完整一行 */
+.firebase-vertical-panel .firebase-vertical-block {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--surface-white);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--rounded);
+}
+
+/* 標題、標籤獨立成行 */
+.firebase-vertical-panel .firebase-section-label,
+.firebase-vertical-panel .firebase-vertical-block > strong,
+.firebase-vertical-panel .form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+/* 文字正常換行，不撐寬容器 */
+.firebase-vertical-panel .firebase-help-text,
+.firebase-vertical-panel #firebaseLoginStatus,
+.firebase-vertical-panel #tripCloudMessage {
+  margin: 8px 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* 覆蓋先前行程代碼 width: 0 的設定 */
+.firebase-vertical-panel #inputTripCode,
+.firebase-vertical-panel #firebaseUidOutput {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 42px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  font-size: 16px;
+}
+
+/* 每個按鈕佔完整一行，不與其他按鈕並排 */
+.firebase-vertical-panel button {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  height: auto;
+  margin: 10px 0 0 !important;
+  padding: 10px 14px;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  white-space: normal;
+  line-height: 1.5;
+  font-size: 0.88rem;
+  border-radius: 10px;
+}
+
+/* 不強制 display，避免破壞登入／登出按鈕的隱藏功能 */
+
+/* 圖示保持正常大小 */
+.firebase-vertical-panel button svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* 管理員的申請及成員清單 */
+.firebase-vertical-panel #tripJoinRequests,
+.firebase-vertical-panel #tripApprovedMembers {
+  display: block;
+  min-width: 0;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
   </style>
 </head>
 <body>
@@ -1423,91 +1523,87 @@
         </div>
       </div>
     </div>
+<!-- Firebase：所有操作垂直排列 -->
+<div class="box-card firebase-vertical-panel">
 
-    <!-- Requirement 8: Firebase 資料庫同步與 GitHub Pages 佈署專區 -->
-    <div class="box-card">
-      <div class="box-card-header">
-        <h2 class="card-title"><i data-lucide="flame"></i> Firebase 雲端多人同步 & GitHub Pages</h2>
-        <span class="badge-sand">靜態無後端架構</span>
-      </div>
-      <p style="font-size: 0.8rem; color: var(--on-surface-variant); margin-top: -4px;">
-        支援直接部署於 <strong>GitHub Pages</strong> 靜態託管。旅伴使用 Google 登入後，輸入行程代碼並申請加入。經管理員核准後，即可共同編輯與同步。
-      </p>
+  <div class="firebase-vertical-heading">
+    <h2 class="card-title">
+      <i data-lucide="flame"></i>
+      Firebase 雲端多人同步
+    </h2>
 
-      <div style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm);">
-    <!-- 真正的 Firebase Google 登入 -->
-    <!-- Google 登入與行程代碼：上下兩行 -->
-<div class="firebase-settings-stack">
+    <span class="badge-sand">GitHub Pages 靜態網站</span>
+  </div>
 
-  <!-- 第一行：Google 登入 -->
-  <div class="firebase-settings-row">
+  <p class="firebase-help-text">
+    使用 Google 登入後，輸入行程代碼。
+    新旅伴需申請加入，經管理員核准後才能共同編輯與同步。
+  </p>
+
+  <!-- Google 登入 -->
+  <div class="firebase-vertical-block">
     <strong>① Google 帳號登入</strong>
 
-    <p id="firebaseLoginStatus"
-       style="font-size: 0.82rem; margin: 8px 0;">
+    <p id="firebaseLoginStatus" class="firebase-help-text">
       正在初始化登入服務……
     </p>
 
-    <div class="firebase-login-buttons">
-      <button type="button"
-              id="btnFirebaseLogin"
-              class="btn-solid-primary"
-              onclick="loginWithGoogle()">
-        使用 Google 登入
-      </button>
+    <button type="button"
+            id="btnFirebaseLogin"
+            class="btn-solid-primary"
+            onclick="loginWithGoogle()">
+      使用 Google 登入
+    </button>
 
-      <button type="button"
-              id="btnFirebaseLogout"
-              class="btn-outline"
-              onclick="logoutFirebase()"
-              style="display: none;">
-        登出
-      </button>
-    </div>
+    <button type="button"
+            id="btnFirebaseLogout"
+            class="btn-outline"
+            onclick="logoutFirebase()"
+            style="display: none;">
+      登出
+    </button>
 
-    <div id="firebaseUidPanel"
-         style="display: none; margin-top: 8px;">
+    <div id="firebaseUidPanel" style="display: none;">
       <label class="form-label" for="firebaseUidOutput">
         使用者 UID
       </label>
 
-      <input id="firebaseUidOutput"
+      <input type="text"
+             id="firebaseUidOutput"
              class="form-input"
-             type="text"
              readonly
              onclick="this.select()">
 
-      <p style="font-size: 0.7rem; margin-bottom: 0;">
-        UID 用於辨識帳號。資料同步狀態請查看雲端連線提示。
+      <p class="firebase-help-text">
+        UID 用於辨識帳號；是否已同步，請查看下方同步狀態。
       </p>
     </div>
   </div>
 
-  <!-- 第二行：行程代碼 -->
-  <div class="firebase-settings-row">
-    <label for="inputTripCode"
-           style="display: block; font-weight: 700; margin-bottom: 8px;">
+  <!-- 行程代碼及連線：各自一行 -->
+  <div class="firebase-vertical-block">
+    <label for="inputTripCode" class="firebase-section-label">
       ② 行程代碼
     </label>
 
-    <div class="firebase-trip-code-row">
-      <input type="text"
-             id="inputTripCode"
-             class="form-input"
-             placeholder="例如：TOKYO2027"
-             value="TOKYO2027-WINTER">
+    <input type="text"
+           id="inputTripCode"
+           class="form-input"
+           placeholder="例如：TOKYO2027-WINTER"
+           value="TOKYO2027-WINTER">
 
-      <button type="button"
-              class="btn-solid-primary"
-              onclick="connectTripSync()">
-        <i data-lucide="radio"></i>
-        連線同步
-      </button>
-    </div>
+    <button type="button"
+            class="btn-solid-primary"
+            onclick="connectTripSync()">
+      <i data-lucide="radio"></i>
+      連線同步
+    </button>
   </div>
-<!-- 行程建立、加入與管理 -->
-<div class="box-card" style="margin-top: 12px;">
-  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+
+  <!-- 行程操作：每個按鈕獨立一行 -->
+  <div class="firebase-vertical-block">
+    <strong>③ 建立或加入行程</strong>
+
     <button type="button"
             class="btn-outline"
             onclick="tripCloud.createTrip()">
@@ -1527,48 +1623,67 @@
     </button>
   </div>
 
-  <p id="tripCloudMessage"
-     style="font-size: 0.8rem; overflow-wrap: anywhere;">
-    尚未連線。新旅伴請申請加入；已核准成員請按連線同步。
-  </p>
+  <!-- 同步狀態與管理員區域 -->
+  <div class="firebase-vertical-block">
+    <strong>④ 同步狀態</strong>
 
-  <div id="tripAdminPanel" style="display: none;">
-    <hr>
-
-    <strong>待核准加入申請</strong>
-    <div id="tripJoinRequests"
-         style="margin-top: 8px;"></div>
-
-    <hr>
-
-    <strong>已核准的同步成員</strong>
-    <p style="font-size: 0.75rem;">
-      管理員本人不列在下方。移除成員會停止其後續雲端存取，
-      但不能收回對方已下載的資料。
+    <p id="tripCloudMessage"
+       class="firebase-help-text"
+       role="status">
+      尚未連線。新旅伴請申請加入；已核准成員請按連線同步。
     </p>
 
-    <div id="tripApprovedMembers"></div>
+    <div id="tripAdminPanel" style="display: none;">
+      <hr>
+
+      <strong>待核准加入申請</strong>
+      <div id="tripJoinRequests"></div>
+
+      <hr>
+
+      <strong>已核准的同步成員</strong>
+
+      <p class="firebase-help-text">
+        管理員本人不列在下方。
+        移除權限可停止後續雲端存取，但不能收回已下載的資料。
+      </p>
+
+      <div id="tripApprovedMembers"></div>
+    </div>
+  </div>
+
+  <!-- 其他工具：各自獨立一行 -->
+  <div class="firebase-vertical-block">
+    <strong>⑤ 其他工具</strong>
+
+    <p class="firebase-help-text">
+      目前已在程式中設定 Firebase 專案，一般使用不需要重新設定。
+      匯入 JSON 會取代目前畫面資料；已連線時也會嘗試儲存至雲端，
+      請先確認備份內容。
+    </p>
+
+    <button type="button"
+            class="btn-outline"
+            onclick="openFirebaseConfigModal()">
+      <i data-lucide="settings"></i>
+      設定 Firebase Config
+    </button>
+
+    <button type="button"
+            class="btn-outline"
+            onclick="document.getElementById('importFileInput').click()">
+      <i data-lucide="upload"></i>
+      匯入 JSON 備份
+    </button>
+
+    <input type="file"
+           id="importFileInput"
+           accept=".json"
+           style="display: none;"
+           onchange="importDataJson(event)">
   </div>
 </div>
-  
-</div>
-
-      <div style="background: var(--surface-white); border: 1px solid var(--outline-light); border-radius: var(--rounded); padding: 8px 10px; font-size: 0.76rem; color: var(--on-surface-variant);">
-        💡 <strong>佈署提示：</strong>本系統內建完整 <code>firebaseConfig</code> 介面。若需切換至您自己的 Firebase 專案，點擊下方「設定 Firebase Config」填入 API Key 即可。
-      </div>
-
-      <div style="display: flex; gap: var(--space-xs); margin-top: var(--space-sm);">
-        <button class="btn-outline" style="font-size: 0.78rem;" onclick="openFirebaseConfigModal()">
-          <i data-lucide="settings"></i> 設定 Firebase Config
-        </button>
-        <button class="btn-outline" style="font-size: 0.78rem;" onclick="document.getElementById('importFileInput').click()">
-          <i data-lucide="upload"></i> 匯入 JSON 備份
-        </button>
-        <input type="file" id="importFileInput" style="display:none" accept=".json" onchange="importDataJson(event)">
-      </div>
-    </div>
-
-  </section>
+</section>
 
   <!-- TAB 2: 📅 每日行程 (Daily Itinerary & Packing Checklist) -->
   <section id="tab-itinerary" class="tab-content">
