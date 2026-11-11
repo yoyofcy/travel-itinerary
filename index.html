@@ -1236,6 +1236,64 @@
     font-size: 0.8rem;
   }
 }
+/* Google 登入與行程代碼：固定上下排列 */
+.firebase-settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.firebase-settings-row {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-white);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--rounded);
+}
+
+.firebase-login-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.firebase-trip-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 覆蓋先前 inputTripCode 的 width: 0 */
+.firebase-settings-stack #inputTripCode,
+.firebase-settings-stack #firebaseUidOutput {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
+.firebase-trip-code-row > button {
+  justify-content: center;
+  white-space: nowrap;
+  padding: 8px 10px;
+}
+
+/* 特別窄的手機：連線按鈕另起一行，避免擠出畫面 */
+@media (max-width: 360px) {
+  .firebase-trip-code-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .firebase-trip-code-row > button {
+    width: 100%;
+  }
+}    
   </style>
 </head>
 <body>
@@ -1377,55 +1435,78 @@
       </p>
 
       <div style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm);">
-              <!-- 真正的 Firebase Google 登入 -->
-      <div style="background: var(--surface-white); border: 1px solid var(--outline-variant); border-radius: var(--rounded); padding: 12px; margin-bottom: 12px;">
+    <!-- 真正的 Firebase Google 登入 -->
+    <!-- Google 登入與行程代碼：上下兩行 -->
+<div class="firebase-settings-stack">
 
-        <strong>Google 帳號登入</strong>
+  <!-- 第一行：Google 登入 -->
+  <div class="firebase-settings-row">
+    <strong>① Google 帳號登入</strong>
 
-        <p id="firebaseLoginStatus"
-           style="font-size: 0.82rem; margin: 8px 0;">
-          正在初始化登入服務……
-        </p>
+    <p id="firebaseLoginStatus"
+       style="font-size: 0.82rem; margin: 8px 0;">
+      正在初始化登入服務……
+    </p>
 
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button"
-                  id="btnFirebaseLogin"
-                  class="btn-solid-primary"
-                  onclick="loginWithGoogle()">
-            使用 Google 登入
-          </button>
+    <div class="firebase-login-buttons">
+      <button type="button"
+              id="btnFirebaseLogin"
+              class="btn-solid-primary"
+              onclick="loginWithGoogle()">
+        使用 Google 登入
+      </button>
 
-          <button type="button"
-                  id="btnFirebaseLogout"
-                  class="btn-outline"
-                  onclick="logoutFirebase()"
-                  style="display: none;">
-            登出
-          </button>
-        </div>
+      <button type="button"
+              id="btnFirebaseLogout"
+              class="btn-outline"
+              onclick="logoutFirebase()"
+              style="display: none;">
+        登出
+      </button>
+    </div>
 
-        <div id="firebaseUidPanel"
-             style="display: none; margin-top: 12px;">
-          <label class="form-label" for="firebaseUidOutput">
-            你的 Firebase 使用者 UID
-          </label>
+    <div id="firebaseUidPanel"
+         style="display: none; margin-top: 8px;">
+      <label class="form-label" for="firebaseUidOutput">
+        使用者 UID
+      </label>
 
-          <input id="firebaseUidOutput"
-                 class="form-input"
-                 type="text"
-                 readonly
-                 style="width: 100%; margin-top: 4px;"
-                 onclick="this.select()">
+      <input id="firebaseUidOutput"
+             class="form-input"
+             type="text"
+             readonly
+             onclick="this.select()">
 
-          <p style="font-size: 0.75rem; margin-bottom: 0;">
-            UID 僅供設定權限使用；資料尚未同步。
-          </p>
-        </div>
-      </div>
-        
-        <input type="text" id="inputTripCode" class="form-input" style="flex: 1;" placeholder="輸入連線行程代碼 (例如: TOKYO2027)" value="TOKYO2027-WINTER">
-        <button class="btn-solid-primary" onclick="connectTripSync()"><i data-lucide="radio"></i> 連線同步</button>
-      </div>
+      <p style="font-size: 0.7rem; margin-bottom: 0;">
+        UID 僅供設定權限使用；資料尚未同步。
+      </p>
+    </div>
+  </div>
+
+  <!-- 第二行：行程代碼 -->
+  <div class="firebase-settings-row">
+    <label for="inputTripCode"
+           style="display: block; font-weight: 700; margin-bottom: 8px;">
+      ② 行程代碼
+    </label>
+
+    <div class="firebase-trip-code-row">
+      <input type="text"
+             id="inputTripCode"
+             class="form-input"
+             placeholder="例如：TOKYO2027"
+             value="TOKYO2027-WINTER">
+
+      <button type="button"
+              class="btn-solid-primary"
+              onclick="connectTripSync()">
+        <i data-lucide="radio"></i>
+        連線同步
+      </button>
+    </div>
+  </div>
+
+</div>
 
       <div style="background: var(--surface-white); border: 1px solid var(--outline-light); border-radius: var(--rounded); padding: 8px 10px; font-size: 0.76rem; color: var(--on-surface-variant);">
         💡 <strong>佈署提示：</strong>本系統內建完整 <code>firebaseConfig</code> 介面。若需切換至您自己的 Firebase 專案，點擊下方「設定 Firebase Config」填入 API Key 即可。
